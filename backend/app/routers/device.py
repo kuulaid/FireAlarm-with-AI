@@ -3,6 +3,8 @@ from app.schemas.sensor import SensorReading, AnalysisResult
 from app.services.analysis import heuristic_risk
 from app.services.openai_service import analyze_with_openai
 from app.state import LATEST_ANALYSIS
+from app.core.database import readings_collection, results_collection
+from datetime import datetime
 
 router = APIRouter(prefix="/api", tags=["device"])
 
@@ -41,8 +43,99 @@ def post_reading(reading: SensorReading):
     LATEST_ANALYSIS["reading"] = reading.model_dump()
     LATEST_ANALYSIS["analysis"] = ai_result
 
+    # Save to database
+    if readings_collection is not None:
+        try:
+            reading_doc = {
+                "device_id": reading.device_id,
+                "mq7": reading.mq7,
+                "mq135": reading.mq135,
+                "mq2": reading.mq2,
+                "dht22_temp": reading.dht22_temp,
+                "dht22_humidity": reading.dht22_humidity,
+                "flame_detected": reading.flame_detected,
+                "timestamp": reading.timestamp,
+                "analysis": ai_result,
+                "created_at": datetime.utcnow()
+            }
+            result = readings_collection.insert_one(reading_doc)
+            print(f"Reading saved to MongoDB with ID: {result.inserted_id}")
+            
+            # Save results to separate collection
+            if results_collection is not None:
+                result_doc = {
+                    "device_id": reading.device_id,
+                    "reading_id": result.inserted_id,
+                    "timestamp": reading.timestamp,
+                    **ai_result,  # Unpack all analysis fields
+                    "created_at": datetime.utcnow()
+                }
+                result_insert = results_collection.insert_one(result_doc)
+                print(f"Analysis result saved to MongoDB with ID: {result_insert.inserted_id}")
+        except Exception as db_error:
+            print(f"Database error saving: {db_error}")
+    else:
+        print("MongoDB collection not available. Data not saved to database.")
+
     return ai_result
 
 @router.get("/latest", response_model=dict)
 def get_latest():
     return LATEST_ANALYSIS
+
+@router.get("/readings", response_model=list)
+def get_readings(limit: int = 10):
+    if readings_collection is None:
+        print("MongoDB collection not available")
+        return []
+    try:
+        readings = list(readings_collection.find().sort("created_at", -1).limit(limit))
+        print(f"Retrieved {len(readings)} readings from MongoDB")
+        # Convert ObjectId to string for JSON serialization
+        for reading in readings:
+            reading["_id"] = str(reading["_id"])
+        return readings
+    except Exception as db_error:
+        print(f"Database error retrieving readings: {db_error}")
+        return []
+
+@router.get("/health/db")
+def check_db_health():
+    """Check MongoDB connection health"""
+    if readings_collection is None or results_collection is None:
+        return {"status": "disconnected", "message": "MongoDB connection not established"}
+    try:
+        from app.core.database import client
+        client.admin.command('ping')
+        readings_count = readings_collection.count_documents({})
+        results_count = results_collection.count_documents({})
+        return {
+            "status": "connected", 
+            "readings_count": readings_count,
+            "results_count": results_count
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/results", response_model=list)
+def get_results(limit: int = 10, device_id: str = None):
+    """Get analysis results"""
+    from app.core.database import results_collection
+    if results_collection is None:
+        print("MongoDB results collection not available")
+        return []
+    try:
+        filter_query = {}
+        if device_id:
+            filter_query["device_id"] = device_id
+        results = list(results_collection.find(filter_query).sort("created_at", -1).limit(limit))
+        print(f"Retrieved {len(results)} results from MongoDB")
+        # Convert ObjectId to string for JSON serialization
+        for result in results:
+            result["_id"] = str(result["_id"])
+            if "reading_id" in result:
+                result["reading_id"] = str(result["reading_id"])
+        return results
+    except Exception as db_error:
+        print(f"Database error retrieving results: {db_error}")
+        return []
