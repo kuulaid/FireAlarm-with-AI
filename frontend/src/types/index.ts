@@ -1,4 +1,4 @@
-export type DangerLevel = "CRITICAL" | "MEDIUM" | "LOW";
+export type DangerLevel = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type SensorStatus = "CRITICAL" | "WARNING" | "NORMAL";
 export type ChipStatus = SensorStatus | "SAFE" | "DANGER";
 export type PageKey = "home" | "history" | "detail";

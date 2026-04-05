@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Clock, Home } from "lucide-react";
 import { ANIMATION_CSS } from "./utils/animation";
 import { MOCK_HISTORY } from "./data/mockHistory";
+import { fetchHistory, fetchLatestAnalysis } from "./services/api";
 import { PageKey, LogEntry } from "./types";
 import { Sidebar, Topbar, BottomNav } from "./components";
 import { HomePage } from "./pages/HomePage";
@@ -14,8 +15,10 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [pageKey, setPageKey] = useState(0);
-
-  const liveData = MOCK_HISTORY[0];
+  const [liveData, setLiveData] = useState<LogEntry>(MOCK_HISTORY[0]);
+  const [history, setHistory] = useState<LogEntry[]>(MOCK_HISTORY);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -25,6 +28,27 @@ export default function App() {
     return () => {
       document.head.removeChild(style);
     };
+  }, []);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [latest, savedHistory] = await Promise.all([fetchLatestAnalysis(), fetchHistory(10)]);
+        setLiveData(latest);
+        setHistory(savedHistory.length ? savedHistory : MOCK_HISTORY);
+        setError(null);
+      } catch (err) {
+        console.error(err);
+        setError("Unable to reach backend API. Showing mock data.");
+        setLiveData(MOCK_HISTORY[0]);
+        setHistory(MOCK_HISTORY);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   const handleSelectLog = useCallback((log: LogEntry) => {
@@ -61,14 +85,16 @@ export default function App() {
             <HomePage
               key={pageKey}
               liveData={liveData}
-              history={MOCK_HISTORY}
+              history={history}
+              loading={loading}
+              error={error}
               onViewHistory={() => navigateTo("history")}
               onSelectLog={handleSelectLog}
             />
           )}
 
           {page === "history" && (
-            <HistoryPage key={pageKey} history={MOCK_HISTORY} onSelect={handleSelectLog} />
+            <HistoryPage key={pageKey} history={history} loading={loading} onSelect={handleSelectLog} />
           )}
 
           {page === "detail" && selectedLog && (

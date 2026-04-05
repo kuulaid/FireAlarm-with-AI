@@ -5,14 +5,29 @@ import { AlertBanner, ActivityRow, SensorGrid } from "../components";
 interface HomePageProps {
   liveData: LogEntry;
   history: LogEntry[];
+  loading: boolean;
+  error: string | null;
   onViewHistory: () => void;
   onSelectLog: (log: LogEntry) => void;
 }
 
 // Dashboard home page, showing the current alert and the latest sensor readings.
-export function HomePage({ liveData, history, onViewHistory, onSelectLog }: HomePageProps) {
+export function HomePage({ liveData, history, loading, error, onViewHistory, onSelectLog }: HomePageProps) {
+  if (loading) {
+    return (
+      <div className="anim-page rounded-2xl bg-white p-6 text-center text-slate-500 shadow-sm">
+        Loading dashboard data from the backend...
+      </div>
+    );
+  }
+
   return (
     <div className="anim-page">
+      {error && (
+        <div className="rounded-2xl bg-orange-50 border border-orange-200 p-4 mb-5 text-sm text-orange-700">
+          {error}
+        </div>
+      )}
       <AlertBanner data={liveData} />
 
       <div className="flex items-center justify-between mb-3 anim-item">
@@ -34,11 +49,17 @@ export function HomePage({ liveData, history, onViewHistory, onSelectLog }: Home
         </button>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {history.slice(0, 3).map((entry) => (
-          <ActivityRow key={entry.id} entry={entry} onClick={() => onSelectLog(entry)} />
-        ))}
-      </div>
+      {history.length === 0 ? (
+        <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5 text-sm text-slate-500">
+          No recent activity has been recorded yet.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {history.slice(0, 3).map((entry) => (
+            <ActivityRow key={entry.id} entry={entry} onClick={() => onSelectLog(entry)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

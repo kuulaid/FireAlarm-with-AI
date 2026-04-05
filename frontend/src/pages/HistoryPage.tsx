@@ -5,11 +5,28 @@ import { getLevelTheme } from "../utils/theme";
 
 interface HistoryPageProps {
   history: LogEntry[];
+  loading: boolean;
   onSelect: (log: LogEntry) => void;
 }
 
 // History page showing all saved detection events and summary details for the latest event.
-export function HistoryPage({ history, onSelect }: HistoryPageProps) {
+export function HistoryPage({ history, loading, onSelect }: HistoryPageProps) {
+  if (loading) {
+    return (
+      <div className="anim-page rounded-2xl bg-white p-6 text-center text-slate-500 shadow-sm">
+        Loading history from the backend...
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="anim-page rounded-2xl bg-white p-6 text-center text-slate-500 shadow-sm">
+        No history is available yet. Check back after the system records more readings.
+      </div>
+    );
+  }
+
   const latest = history[0];
   const theme = getLevelTheme(latest.danger_level);
   const StatusIcon = latest.danger ? AlertTriangle : CheckCircle;

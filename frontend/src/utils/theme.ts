@@ -25,6 +25,7 @@ export interface SensorTheme {
 export function getLevelTheme(lvl: DangerLevel): LevelTheme {
   switch (lvl) {
     case "CRITICAL":
+    case "HIGH":
       return {
         textStrong: "text-red-500",
         textMuted: "text-red-400",
