@@ -1,4 +1,7 @@
-export const MOCK_HISTORY = [
+import { LogEntry } from "../types";
+
+// Static mock dataset used by the frontend for the dashboard experience.
+export const MOCK_HISTORY: LogEntry[] = [
   {
     id: "1",
     timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
