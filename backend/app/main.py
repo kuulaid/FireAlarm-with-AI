@@ -13,6 +13,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+print(f"--- CORS ORIGINS LOADED: {CORS_ORIGINS} ---")
+
 app.include_router(device_router)
 
 @app.get("/")
