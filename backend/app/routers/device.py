@@ -81,6 +81,26 @@ def post_reading(reading: SensorReading):
 
 @router.get("/latest", response_model=dict)
 def get_latest():
+    # If no analysis in memory, fetch the latest from database
+    if not LATEST_ANALYSIS.get("analysis") and readings_collection is not None:
+        try:
+            latest_reading = readings_collection.find_one(sort=[("created_at", -1)])
+            if latest_reading:
+                latest_reading["_id"] = str(latest_reading["_id"])
+                return {
+                    "reading": {
+                        "mq7": latest_reading.get("mq7"),
+                        "mq135": latest_reading.get("mq135"),
+                        "mq2": latest_reading.get("mq2"),
+                        "dht22_temp": latest_reading.get("dht22_temp"),
+                        "dht22_humidity": latest_reading.get("dht22_humidity"),
+                        "flame_detected": latest_reading.get("flame_detected"),
+                        "timestamp": latest_reading.get("timestamp"),
+                    },
+                    "analysis": latest_reading.get("analysis"),
+                }
+        except Exception as db_error:
+            print(f"Database error fetching latest: {db_error}")
     return LATEST_ANALYSIS
 
 @router.get("/readings", response_model=list)
