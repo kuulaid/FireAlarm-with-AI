@@ -30,11 +30,36 @@ export default function App() {
     };
   }, []);
 
+  // --- Auto-Refresh and Notifications Effect ---
   useEffect(() => {
+    // Request Browser Notification Permissions on initial load
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    let isInitialLoad = true;
+    let previousDangerLevel: string | null = null;
+
     const loadData = async () => {
-      setLoading(true);
+      // Only set loading to true on the very first render to prevent screen flickering
+      if (isInitialLoad) setLoading(true);
+      
       try {
         const [latest, savedHistory] = await Promise.all([fetchLatestAnalysis(), fetchHistory(10)]);
+        
+        // Check for State Changes & Send Notification
+        if (!isInitialLoad && previousDangerLevel && previousDangerLevel !== latest.danger_level) {
+          if (Notification.permission === "granted") {
+            new Notification("⚠️ Fire Alarm Status Changed", {
+              body: `State changed from ${previousDangerLevel} to ${latest.danger_level}. \n${latest.summary}`,
+              icon: "/favicon.ico" 
+            });
+          }
+        }
+        
+        // Update the previous level for the next interval check
+        previousDangerLevel = latest.danger_level;
+
         setLiveData(latest);
         setHistory(savedHistory.length ? savedHistory : MOCK_HISTORY);
         setError(null);
@@ -44,12 +69,23 @@ export default function App() {
         setLiveData(MOCK_HISTORY[0]);
         setHistory(MOCK_HISTORY);
       } finally {
-        setLoading(false);
+        if (isInitialLoad) {
+          setLoading(false);
+          isInitialLoad = false;
+        }
       }
     };
 
+    // 1. Initial Load
     loadData();
+
+    // 2. Set up Auto-Refresh Polling every 5 seconds
+    const intervalId = setInterval(loadData, 5000);
+    
+    // 3. Cleanup interval when the component unmounts
+    return () => clearInterval(intervalId);
   }, []);
+  // ---------------------------------------------
 
   const handleSelectLog = useCallback((log: LogEntry) => {
     setSelectedLog(log);
