@@ -72,6 +72,18 @@ def post_reading(reading: SensorReading):
                 }
                 result_insert = results_collection.insert_one(result_doc)
                 print(f"Analysis result saved to MongoDB with ID: {result_insert.inserted_id}")
+
+
+            #Only 50 scans history, deletes 51+
+            cursor = readings_collection.find({}, {"_id": 1}).sort("created_at", -1).skip(50)
+            ids_to_delete = [doc["_id"] for doc in cursor]
+            
+            if ids_to_delete:
+                readings_collection.delete_many({"_id": {"$in": ids_to_delete}})
+                if results_collection is not None:
+                    results_collection.delete_many({"reading_id": {"$in": ids_to_delete}})
+                print(f"Deleted {len(ids_to_delete)} old scans to maintain 50 limit.")
+
         except Exception as db_error:
             print(f"Database error saving: {db_error}")
     else:
