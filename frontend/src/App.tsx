@@ -9,8 +9,21 @@ import { HomePage } from "./pages/HomePage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { DetailPage } from "./pages/DetailPage";
 
-// Main application shell that controls page navigation and shared layout.
+// Import your manual alarm component
+import ManualAlarmSwitch from "./components/ManualAlarmSwitch"; 
+
 export default function App() {
+  // --- HIDDEN ROUTE INTERCEPTOR ---
+  // If you manually type /api/alarm into the browser URL, it renders ONLY this screen.
+  if (window.location.pathname === "/api/alarm") {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <ManualAlarmSwitch />
+      </div>
+    );
+  }
+
+  // --- STANDARD APP STATE ---
   const [page, setPage] = useState<PageKey>("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
@@ -30,9 +43,7 @@ export default function App() {
     };
   }, []);
 
-  // --- Auto-Refresh and Notifications Effect ---
   useEffect(() => {
-    // Request Browser Notification Permissions on initial load
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
@@ -41,13 +52,11 @@ export default function App() {
     let previousDangerLevel: string | null = null;
 
     const loadData = async () => {
-      // Only set loading to true on the very first render to prevent screen flickering
       if (isInitialLoad) setLoading(true);
       
       try {
         const [latest, savedHistory] = await Promise.all([fetchLatestAnalysis(), fetchHistory(10)]);
         
-        // Check for State Changes & Send Notification
         if (!isInitialLoad && previousDangerLevel && previousDangerLevel !== latest.danger_level) {
           if (Notification.permission === "granted") {
             new Notification("⚠️ Fire Alarm Status Changed", {
@@ -57,7 +66,6 @@ export default function App() {
           }
         }
         
-        // Update the previous level for the next interval check
         previousDangerLevel = latest.danger_level;
 
         setLiveData(latest);
@@ -76,16 +84,10 @@ export default function App() {
       }
     };
 
-    // 1. Initial Load
     loadData();
-
-    // 2. Set up Auto-Refresh Polling every 5 seconds
     const intervalId = setInterval(loadData, 5000);
-    
-    // 3. Cleanup interval when the component unmounts
     return () => clearInterval(intervalId);
   }, []);
-  // ---------------------------------------------
 
   const handleSelectLog = useCallback((log: LogEntry) => {
     setSelectedLog(log);
@@ -100,6 +102,7 @@ export default function App() {
     setSidebarOpen(false);
   };
 
+  // The Override option is completely removed from the menus here
   const navItems = [
     { key: "home", pages: ["home"] as PageKey[], label: "Home", icon: <Home className="w-4 h-4" /> },
     { key: "history-detail", pages: ["history", "detail"] as PageKey[], label: "History", icon: <Clock className="w-4 h-4" /> },
