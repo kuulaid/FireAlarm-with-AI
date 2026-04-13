@@ -21,4 +21,4 @@ app.include_router(alarm)
 
 @app.get("/")
 def root():
-    return {"message": "Gas Alert API is running"}
+    return {"message": "Project Alab API is running"}
