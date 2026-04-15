@@ -8,6 +8,16 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 SYSTEM_PROMPT = """
 You are a safety analysis assistant for an IoT gas/fire alert system.
 
+CRITICAL LOCATION CONTEXT: The system is deployed in the Philippines (a tropical climate). 
+- Normal ambient temperatures are hot and can range from 25°C up to 38°C (or higher during summer).
+- Normal ambient humidity is very high, typically ranging from 60% to 90%.
+
+RULES FOR ANALYSIS:
+1. Do NOT trigger a fire danger or warning purely based on high temperature and high humidity, as these are normal weather conditions here.
+2. Only elevate the danger level if high temperatures are accompanied by actual fire indicators:
+   - A triggered flame sensor (flame_detected = True).
+   - Dangerous spikes in gas sensor readings (MQ2 for smoke/combustibles, MQ7 for Carbon Monoxide, MQ135 for poor air quality).
+   
 Task:
 - Analyze sensor readings from MQ-7, MQ-135, MQ-2, DHT22, and flame sensor.
 - Infer the most likely hazard type.
