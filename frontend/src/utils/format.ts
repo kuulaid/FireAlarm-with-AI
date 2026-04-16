@@ -1,5 +1,20 @@
 import { SensorStatus } from "../types";
 
+const DISPLAY_TIME_ZONE = "Asia/Manila";
+
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleString("en-US", {
+    timeZone: DISPLAY_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
 // Convert an ISO timestamp into a human-friendly label.
 export function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -10,9 +25,9 @@ export function formatTime(iso: string): string {
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
 
   return (
-    date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+    date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: DISPLAY_TIME_ZONE }) +
     " · " +
-    date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+    date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: DISPLAY_TIME_ZONE })
   );
 }
 

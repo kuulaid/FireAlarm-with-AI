@@ -2,6 +2,7 @@ import { ArrowLeft, AlertTriangle, CheckCircle, Clock, ClipboardList, Download, 
 import { LogEntry } from "../types";
 import { InfoBlock } from "../components";
 import { getLevelTheme } from "../utils/theme";
+import { formatDateTime } from "../utils/format";
 
 interface DetailPageProps {
   log: LogEntry;
@@ -37,7 +38,7 @@ export function DetailPage({ log, onBack }: DetailPageProps) {
         </span>
 
         <p className="text-[11px] font-semibold tracking-wider uppercase text-slate-400 mb-1 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5" /> {new Date(log.timestamp).toLocaleString()}
+          <Clock className="w-3.5 h-3.5" /> {formatDateTime(log.timestamp)}
         </p>
         <div className="flex items-baseline gap-1.5 mb-2">
           <span className={`font-extrabold text-4xl leading-none tracking-tight ${theme.textStrong}`}>{log.sensors.mq7 ?? "--"}</span>

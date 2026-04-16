@@ -1,16 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.sensor import SensorReading, AnalysisResult
 from app.services.analysis import heuristic_risk
-from app.services.analysis import infer_flame_detected
+from app.services.analysis import evaluate_flame_signal
 from app.services.openai_service import analyze_with_openai
-from app.state import LATEST_ANALYSIS
+from app.state import LATEST_ANALYSIS, FLAME_SIGNAL_STATE
 from app.core.database import readings_collection, results_collection
+from app.core.config import FLAME_OVERRIDE_MIN_CONFIDENCE
 from datetime import datetime, timedelta, timezone
 
 UTC_PLUS_8 = timezone(timedelta(hours=8))
 
 
-def normalize_timestamp(value):
+def normalize_timestamp(value, naive_is_utc: bool = False):
     if value is None:
         return datetime.now(UTC_PLUS_8)
 
@@ -19,7 +20,10 @@ def normalize_timestamp(value):
         value = datetime.fromisoformat(value)
 
     if value.tzinfo is None:
-        return value.replace(tzinfo=UTC_PLUS_8)
+        if naive_is_utc:
+            value = value.replace(tzinfo=timezone.utc)
+        else:
+            value = value.replace(tzinfo=UTC_PLUS_8)
 
     return value.astimezone(UTC_PLUS_8)
 
@@ -28,10 +32,10 @@ def normalize_reading_doc(doc):
     normalized = dict(doc)
 
     if "timestamp" in normalized:
-        normalized["timestamp"] = normalize_timestamp(normalized["timestamp"])
+        normalized["timestamp"] = normalize_timestamp(normalized["timestamp"], naive_is_utc=True)
 
     if "created_at" in normalized:
-        normalized["created_at"] = normalize_timestamp(normalized["created_at"])
+        normalized["created_at"] = normalize_timestamp(normalized["created_at"], naive_is_utc=True)
 
     if "_id" in normalized:
         normalized["_id"] = str(normalized["_id"])
@@ -45,13 +49,30 @@ router = APIRouter(prefix="/api", tags=["device"])
 
 @router.post("/readings", response_model=AnalysisResult)
 def post_reading(reading: SensorReading):
+    signal_state = FLAME_SIGNAL_STATE.get(reading.device_id, {})
+    flame_signal = evaluate_flame_signal(reading, state=signal_state)
+
+    FLAME_SIGNAL_STATE[reading.device_id] = {
+        "filtered_value": flame_signal["filtered_value"],
+        "detected": flame_signal["detected"],
+        "trigger_count": flame_signal["trigger_count"],
+        "clear_count": flame_signal["clear_count"],
+        "recent_values": flame_signal["recent_values"],
+    }
+
     normalized_reading = reading.model_copy(
         update={
             "timestamp": normalize_timestamp(reading.timestamp),
-            "flame_detected": infer_flame_detected(reading),
+            "flame_detected": flame_signal["detected"],
+            "flame_filtered_value": flame_signal["filtered_value"],
+            "flame_confidence": flame_signal["confidence"],
+            "flame_sensor_fault": flame_signal["sensor_fault"],
         }
     )
     heuristic = heuristic_risk(normalized_reading)
+
+    if flame_signal["valid"] and flame_signal["reason"] not in heuristic["reasons"]:
+        heuristic["reasons"].append(flame_signal["reason"])
 
     try:
         ai_result = analyze_with_openai(
@@ -72,8 +93,12 @@ def post_reading(reading: SensorReading):
             "trigger_led": heuristic["danger"],
         }
 
-    # Safety override: never let the model suppress an obvious flame event
-    if normalized_reading.flame_detected:
+    # Safety override: only force CRITICAL when flame confidence is high and signal is healthy.
+    if (
+        normalized_reading.flame_detected
+        and not normalized_reading.flame_sensor_fault
+        and (normalized_reading.flame_confidence or 0.0) >= FLAME_OVERRIDE_MIN_CONFIDENCE
+    ):
         ai_result["danger"] = True
         ai_result["danger_level"] = "CRITICAL"
         ai_result["trigger_buzzer"] = True
@@ -95,6 +120,9 @@ def post_reading(reading: SensorReading):
                 "dht22_temp": normalized_reading.dht22_temp,
                 "dht22_humidity": normalized_reading.dht22_humidity,
                 "flame_value": normalized_reading.flame_value,
+                "flame_filtered_value": normalized_reading.flame_filtered_value,
+                "flame_confidence": normalized_reading.flame_confidence,
+                "flame_sensor_fault": normalized_reading.flame_sensor_fault,
                 "flame_detected": normalized_reading.flame_detected,
                 "timestamp": normalized_reading.timestamp,
                 "analysis": ai_result,
@@ -109,6 +137,9 @@ def post_reading(reading: SensorReading):
                     "device_id": normalized_reading.device_id,
                     "reading_id": result.inserted_id,
                     "flame_value": normalized_reading.flame_value,
+                    "flame_filtered_value": normalized_reading.flame_filtered_value,
+                    "flame_confidence": normalized_reading.flame_confidence,
+                    "flame_sensor_fault": normalized_reading.flame_sensor_fault,
                     "timestamp": normalized_reading.timestamp,
                     **ai_result,  # Unpack all analysis fields
                     "created_at": datetime.now(UTC_PLUS_8)
@@ -152,6 +183,9 @@ def get_latest():
                         "dht22_temp": latest_reading.get("dht22_temp"),
                         "dht22_humidity": latest_reading.get("dht22_humidity"),
                         "flame_value": latest_reading.get("flame_value"),
+                        "flame_filtered_value": latest_reading.get("flame_filtered_value"),
+                        "flame_confidence": latest_reading.get("flame_confidence"),
+                        "flame_sensor_fault": latest_reading.get("flame_sensor_fault"),
                         "flame_detected": latest_reading.get("flame_detected"),
                         "timestamp": latest_reading.get("timestamp"),
                         "created_at": latest_reading.get("created_at"),

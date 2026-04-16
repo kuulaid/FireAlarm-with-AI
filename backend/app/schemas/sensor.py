@@ -11,6 +11,9 @@ class SensorReading(BaseModel):
     dht22_humidity: float = Field(..., description="Humidity percentage")
     flame_value: Optional[float] = Field(None, description="Raw analog flame sensor reading")
     flame_detected: Optional[bool] = Field(None, description="Derived fire state from the flame sensor")
+    flame_filtered_value: Optional[float] = Field(None, description="Smoothed analog flame value used by backend")
+    flame_confidence: Optional[float] = Field(None, description="Backend confidence (0-1) for flame detection")
+    flame_sensor_fault: Optional[bool] = Field(None, description="True when analog flame signal looks stuck/invalid")
     timestamp: Optional[datetime] = None
 
 class AnalysisResult(BaseModel):

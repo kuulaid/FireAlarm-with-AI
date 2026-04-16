@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle, Clock, Download, Info, Shield } from "lucid
 import { LogEntry } from "../types";
 import { ActivityRow, InfoBlock } from "../components";
 import { getLevelTheme } from "../utils/theme";
+import { formatDateTime } from "../utils/format";
 
 interface HistoryPageProps {
   history: LogEntry[];
@@ -51,7 +52,7 @@ export function HistoryPage({ history, loading, onSelect }: HistoryPageProps) {
         <p className="text-sm font-semibold text-slate-800 mb-1">{latest.summary}</p>
         <p className="text-xs text-slate-400 flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          Recorded: {new Date(latest.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          Recorded: {formatDateTime(latest.timestamp)}
         </p>
 
         <div className="mt-5 bg-slate-50 border border-slate-200 rounded-xl p-4">
