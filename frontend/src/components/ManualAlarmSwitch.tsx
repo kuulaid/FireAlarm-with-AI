@@ -18,14 +18,54 @@ const SCENARIOS: Array<{
     description: "Higher ambient heat, but still below an alarm condition.",
   },
   {
+    key: "PARTIAL_SMOKE",
+    title: "Early Smoke",
+    description: "Early stage smoke detection below critical threshold.",
+  },
+  {
     key: "SMOKE",
     title: "Smoke Test",
     description: "Elevated combustion readings without a flame confirmation.",
   },
   {
+    key: "CO_DETECTION",
+    title: "CO Leak",
+    description: "Carbon monoxide detection - potential appliance malfunction.",
+  },
+  {
     key: "GAS_LEAK",
     title: "Gas Leak",
     description: "Critical combustible gas scenario without an open flame.",
+  },
+  {
+    key: "EXTREME_HEAT",
+    title: "Extreme Heat",
+    description: "Extreme temperature spike - possible radiant fire.",
+  },
+  {
+    key: "ELECTRICAL_FIRE",
+    title: "Electrical Fire",
+    description: "Rapid heat buildup with moderate gas - electrical origin.",
+  },
+  {
+    key: "HIGH_HUMIDITY",
+    title: "High Humidity",
+    description: "Elevated moisture conditions - possible water leak.",
+  },
+  {
+    key: "MIXED_HAZARD",
+    title: "Mixed Hazard",
+    description: "Multiple gas types and heat elevation detected.",
+  },
+  {
+    key: "CONTROLLED_BURN",
+    title: "Controlled Burn",
+    description: "Low-intensity flame detected with moderate gas readings.",
+  },
+  {
+    key: "DUSTY_AIR",
+    title: "Dusty Air",
+    description: "High particulate matter or dust in the air.",
   },
   {
     key: "FIRE_TEST",

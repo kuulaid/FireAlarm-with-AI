@@ -2,7 +2,7 @@ import type { LogEntry, Sensors } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-export type AlarmScenario = "LIVE" | "SAFE" | "WARM" | "SMOKE" | "GAS_LEAK" | "FIRE_TEST";
+export type AlarmScenario = "LIVE" | "SAFE" | "WARM" | "PARTIAL_SMOKE" | "SMOKE" | "CO_DETECTION" | "GAS_LEAK" | "EXTREME_HEAT" | "ELECTRICAL_FIRE" | "HIGH_HUMIDITY" | "MIXED_HAZARD" | "CONTROLLED_BURN" | "DUSTY_AIR" | "FIRE_TEST";
 
 interface ApiAnalysis {
   danger: boolean;
