@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Clock, Home } from "lucide-react";
 import { ANIMATION_CSS } from "./utils/animation";
 import { MOCK_HISTORY } from "./data/mockHistory";
-import { fetchHistory, fetchLatestAnalysis } from "./services/api";
+import { alarmStateToLogEntry, fetchAlarmState, fetchHistory, fetchLatestAnalysis } from "./services/api";
 import { PageKey, LogEntry } from "./types";
 import { Sidebar, Topbar, BottomNav } from "./components";
 import { HomePage } from "./pages/HomePage";
@@ -55,8 +55,31 @@ export default function App() {
       if (isInitialLoad) setLoading(true);
       
       try {
+        const alarmState = await fetchAlarmState();
+        const manualLog = alarmStateToLogEntry(alarmState);
+
+        if (alarmState.feed_paused && manualLog) {
+          if (!isInitialLoad && previousDangerLevel && previousDangerLevel !== manualLog.danger_level) {
+            if (Notification.permission === "granted") {
+              new Notification("⚠️ Manual Fire Test Updated", {
+                body: `Scenario changed from ${previousDangerLevel} to ${manualLog.danger_level}. \n${manualLog.summary}`,
+                icon: "/favicon.ico"
+              });
+            }
+          }
+
+          previousDangerLevel = manualLog.danger_level;
+          setLiveData(manualLog);
+          setHistory((currentHistory) => {
+            const withoutPreview = currentHistory.filter((entry) => entry.id !== manualLog.id);
+            return [manualLog, ...withoutPreview].slice(0, 50);
+          });
+          setError(null);
+          return;
+        }
+
         const [latest, savedHistory] = await Promise.all([fetchLatestAnalysis(), fetchHistory(50)]);
-        
+
         if (!isInitialLoad && previousDangerLevel && previousDangerLevel !== latest.danger_level) {
           if (Notification.permission === "granted") {
             new Notification("⚠️ Fire Alarm Status Changed", {
@@ -65,7 +88,7 @@ export default function App() {
             });
           }
         }
-        
+
         previousDangerLevel = latest.danger_level;
 
         setLiveData(latest);
