@@ -45,6 +45,13 @@ def normalize_reading_doc(doc):
 
     return normalized
 
+
+def serialize_datetime_to_iso(dt):
+    """Convert datetime object to ISO string for JSON responses."""
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return dt
+
 router = APIRouter(prefix="/api", tags=["device"])
 
 @router.post("/readings", response_model=AnalysisResult)
@@ -187,8 +194,8 @@ def get_latest():
                         "flame_confidence": latest_reading.get("flame_confidence"),
                         "flame_sensor_fault": latest_reading.get("flame_sensor_fault"),
                         "flame_detected": latest_reading.get("flame_detected"),
-                        "timestamp": latest_reading.get("timestamp"),
-                        "created_at": latest_reading.get("created_at"),
+                        "timestamp": serialize_datetime_to_iso(latest_reading.get("timestamp")),
+                        "created_at": serialize_datetime_to_iso(latest_reading.get("created_at")),
                     },
                     "analysis": latest_reading.get("analysis"),
                 }
@@ -206,7 +213,14 @@ def get_readings(limit: int = 10):
     try:
         readings = list(readings_collection.find().sort("created_at", -1).limit(limit))
         print(f"Retrieved {len(readings)} readings from MongoDB")
-        return [normalize_reading_doc(reading) for reading in readings]
+        normalized = [normalize_reading_doc(reading) for reading in readings]
+        # Ensure all datetimes are ISO strings for JSON serialization
+        for doc in normalized:
+            if "timestamp" in doc:
+                doc["timestamp"] = serialize_datetime_to_iso(doc["timestamp"])
+            if "created_at" in doc:
+                doc["created_at"] = serialize_datetime_to_iso(doc["created_at"])
+        return normalized
     except Exception as db_error:
         print(f"Database error retrieving readings: {db_error}")
         return []
@@ -242,7 +256,14 @@ def get_results(limit: int = 10, device_id: str = None):
             filter_query["device_id"] = device_id
         results = list(results_collection.find(filter_query).sort("created_at", -1).limit(limit))
         print(f"Retrieved {len(results)} results from MongoDB")
-        return [normalize_reading_doc(result) for result in results]
+        normalized = [normalize_reading_doc(result) for result in results]
+        # Ensure all datetimes are ISO strings for JSON serialization
+        for doc in normalized:
+            if "timestamp" in doc:
+                doc["timestamp"] = serialize_datetime_to_iso(doc["timestamp"])
+            if "created_at" in doc:
+                doc["created_at"] = serialize_datetime_to_iso(doc["created_at"])
+        return normalized
     except Exception as db_error:
         print(f"Database error retrieving results: {db_error}")
         return []
