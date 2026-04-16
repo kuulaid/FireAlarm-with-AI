@@ -136,14 +136,16 @@ def post_reading(reading: SensorReading):
 
 @router.get("/latest", response_model=dict)
 def get_latest():
-    # If no analysis in memory, fetch the latest from database
-    if not LATEST_ANALYSIS.get("analysis") and readings_collection is not None:
+    # Always prefer the latest database record to avoid stale in-memory data.
+    if readings_collection is not None:
         try:
             latest_reading = readings_collection.find_one(sort=[("created_at", -1)])
             if latest_reading:
                 latest_reading = normalize_reading_doc(latest_reading)
                 return {
                     "reading": {
+                        "_id": latest_reading.get("_id"),
+                        "device_id": latest_reading.get("device_id"),
                         "mq7": latest_reading.get("mq7"),
                         "mq135": latest_reading.get("mq135"),
                         "mq2": latest_reading.get("mq2"),
@@ -152,11 +154,14 @@ def get_latest():
                         "flame_value": latest_reading.get("flame_value"),
                         "flame_detected": latest_reading.get("flame_detected"),
                         "timestamp": latest_reading.get("timestamp"),
+                        "created_at": latest_reading.get("created_at"),
                     },
                     "analysis": latest_reading.get("analysis"),
                 }
         except Exception as db_error:
             print(f"Database error fetching latest: {db_error}")
+
+    # Fallback for cases where DB is unavailable.
     return LATEST_ANALYSIS
 
 @router.get("/readings", response_model=list)
