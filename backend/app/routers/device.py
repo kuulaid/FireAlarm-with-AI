@@ -1,20 +1,61 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.sensor import SensorReading, AnalysisResult
 from app.services.analysis import heuristic_risk
+from app.services.analysis import infer_flame_detected
 from app.services.openai_service import analyze_with_openai
 from app.state import LATEST_ANALYSIS
 from app.core.database import readings_collection, results_collection
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+UTC_PLUS_8 = timezone(timedelta(hours=8))
+
+
+def normalize_timestamp(value):
+    if value is None:
+        return datetime.now(UTC_PLUS_8)
+
+    if isinstance(value, str):
+        value = value.replace("Z", "+00:00")
+        value = datetime.fromisoformat(value)
+
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC_PLUS_8)
+
+    return value.astimezone(UTC_PLUS_8)
+
+
+def normalize_reading_doc(doc):
+    normalized = dict(doc)
+
+    if "timestamp" in normalized:
+        normalized["timestamp"] = normalize_timestamp(normalized["timestamp"])
+
+    if "created_at" in normalized:
+        normalized["created_at"] = normalize_timestamp(normalized["created_at"])
+
+    if "_id" in normalized:
+        normalized["_id"] = str(normalized["_id"])
+
+    if "reading_id" in normalized:
+        normalized["reading_id"] = str(normalized["reading_id"])
+
+    return normalized
 
 router = APIRouter(prefix="/api", tags=["device"])
 
 @router.post("/readings", response_model=AnalysisResult)
 def post_reading(reading: SensorReading):
-    heuristic = heuristic_risk(reading)
+    normalized_reading = reading.model_copy(
+        update={
+            "timestamp": normalize_timestamp(reading.timestamp),
+            "flame_detected": infer_flame_detected(reading),
+        }
+    )
+    heuristic = heuristic_risk(normalized_reading)
 
     try:
         ai_result = analyze_with_openai(
-            reading.model_dump(),
+            normalized_reading.model_dump(),
             heuristic
         )
     except Exception as e:
@@ -32,7 +73,7 @@ def post_reading(reading: SensorReading):
         }
 
     # Safety override: never let the model suppress an obvious flame event
-    if reading.flame_detected:
+    if normalized_reading.flame_detected:
         ai_result["danger"] = True
         ai_result["danger_level"] = "CRITICAL"
         ai_result["trigger_buzzer"] = True
@@ -40,23 +81,24 @@ def post_reading(reading: SensorReading):
         if "Flame sensor detected fire" not in ai_result["reasons"]:
             ai_result["reasons"] = ["Flame sensor detected fire"] + ai_result.get("reasons", [])
 
-    LATEST_ANALYSIS["reading"] = reading.model_dump()
+    LATEST_ANALYSIS["reading"] = normalized_reading.model_dump()
     LATEST_ANALYSIS["analysis"] = ai_result
 
     # Save to database
     if readings_collection is not None:
         try:
             reading_doc = {
-                "device_id": reading.device_id,
-                "mq7": reading.mq7,
-                "mq135": reading.mq135,
-                "mq2": reading.mq2,
-                "dht22_temp": reading.dht22_temp,
-                "dht22_humidity": reading.dht22_humidity,
-                "flame_detected": reading.flame_detected,
-                "timestamp": reading.timestamp,
+                "device_id": normalized_reading.device_id,
+                "mq7": normalized_reading.mq7,
+                "mq135": normalized_reading.mq135,
+                "mq2": normalized_reading.mq2,
+                "dht22_temp": normalized_reading.dht22_temp,
+                "dht22_humidity": normalized_reading.dht22_humidity,
+                "flame_value": normalized_reading.flame_value,
+                "flame_detected": normalized_reading.flame_detected,
+                "timestamp": normalized_reading.timestamp,
                 "analysis": ai_result,
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC_PLUS_8)
             }
             result = readings_collection.insert_one(reading_doc)
             print(f"Reading saved to MongoDB with ID: {result.inserted_id}")
@@ -64,11 +106,12 @@ def post_reading(reading: SensorReading):
             # Save results to separate collection
             if results_collection is not None:
                 result_doc = {
-                    "device_id": reading.device_id,
+                    "device_id": normalized_reading.device_id,
                     "reading_id": result.inserted_id,
-                    "timestamp": reading.timestamp,
+                    "flame_value": normalized_reading.flame_value,
+                    "timestamp": normalized_reading.timestamp,
                     **ai_result,  # Unpack all analysis fields
-                    "created_at": datetime.utcnow()
+                    "created_at": datetime.now(UTC_PLUS_8)
                 }
                 result_insert = results_collection.insert_one(result_doc)
                 print(f"Analysis result saved to MongoDB with ID: {result_insert.inserted_id}")
@@ -98,7 +141,7 @@ def get_latest():
         try:
             latest_reading = readings_collection.find_one(sort=[("created_at", -1)])
             if latest_reading:
-                latest_reading["_id"] = str(latest_reading["_id"])
+                latest_reading = normalize_reading_doc(latest_reading)
                 return {
                     "reading": {
                         "mq7": latest_reading.get("mq7"),
@@ -106,6 +149,7 @@ def get_latest():
                         "mq2": latest_reading.get("mq2"),
                         "dht22_temp": latest_reading.get("dht22_temp"),
                         "dht22_humidity": latest_reading.get("dht22_humidity"),
+                        "flame_value": latest_reading.get("flame_value"),
                         "flame_detected": latest_reading.get("flame_detected"),
                         "timestamp": latest_reading.get("timestamp"),
                     },
@@ -123,10 +167,7 @@ def get_readings(limit: int = 10):
     try:
         readings = list(readings_collection.find().sort("created_at", -1).limit(limit))
         print(f"Retrieved {len(readings)} readings from MongoDB")
-        # Convert ObjectId to string for JSON serialization
-        for reading in readings:
-            reading["_id"] = str(reading["_id"])
-        return readings
+        return [normalize_reading_doc(reading) for reading in readings]
     except Exception as db_error:
         print(f"Database error retrieving readings: {db_error}")
         return []
@@ -162,12 +203,7 @@ def get_results(limit: int = 10, device_id: str = None):
             filter_query["device_id"] = device_id
         results = list(results_collection.find(filter_query).sort("created_at", -1).limit(limit))
         print(f"Retrieved {len(results)} results from MongoDB")
-        # Convert ObjectId to string for JSON serialization
-        for result in results:
-            result["_id"] = str(result["_id"])
-            if "reading_id" in result:
-                result["reading_id"] = str(result["reading_id"])
-        return results
+        return [normalize_reading_doc(result) for result in results]
     except Exception as db_error:
         print(f"Database error retrieving results: {db_error}")
         return []

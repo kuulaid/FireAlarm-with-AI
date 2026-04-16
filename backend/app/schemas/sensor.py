@@ -9,7 +9,8 @@ class SensorReading(BaseModel):
     mq2: float = Field(..., description="LPG / smoke / combustible gas sensor value")
     dht22_temp: float = Field(..., description="Temperature in Celsius")
     dht22_humidity: float = Field(..., description="Humidity percentage")
-    flame_detected: bool = Field(..., description="True if flame/IR sensor detects fire")
+    flame_value: Optional[float] = Field(None, description="Raw analog flame sensor reading")
+    flame_detected: Optional[bool] = Field(None, description="Derived fire state from the flame sensor")
     timestamp: Optional[datetime] = None
 
 class AnalysisResult(BaseModel):

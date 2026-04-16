@@ -22,6 +22,7 @@ interface ApiReadingPayload {
   mq2: number;
   dht22_temp: number;
   dht22_humidity: number;
+  flame_value?: number;
   flame_detected: boolean;
   timestamp?: string;
   created_at?: string;

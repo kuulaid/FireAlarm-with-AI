@@ -1,5 +1,19 @@
 from typing import Dict, Any
 
+from app.core.config import FLAME_ANALOG_THRESHOLD
+
+
+def infer_flame_detected(reading) -> bool:
+    explicit = getattr(reading, "flame_detected", None)
+    if explicit is not None:
+        return explicit
+
+    flame_value = getattr(reading, "flame_value", None)
+    if flame_value is None:
+        return False
+
+    return flame_value <= FLAME_ANALOG_THRESHOLD
+
 def heuristic_risk(reading) -> Dict[str, Any]:
     """
     Very simple fallback heuristic.
@@ -8,9 +22,15 @@ def heuristic_risk(reading) -> Dict[str, Any]:
     score = 0
     reasons = []
 
-    if reading.flame_detected:
+    flame_detected = infer_flame_detected(reading)
+    flame_value = getattr(reading, "flame_value", None)
+
+    if flame_detected:
         score += 60
-        reasons.append("Flame sensor detected heat/flame")
+        if flame_value is None:
+            reasons.append("Flame sensor detected heat/flame")
+        else:
+            reasons.append(f"Flame sensor analog value {flame_value} indicates flame")
 
     if reading.mq2 >= 500:
         score += 20
