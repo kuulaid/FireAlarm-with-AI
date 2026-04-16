@@ -55,7 +55,7 @@ export default function App() {
       if (isInitialLoad) setLoading(true);
       
       try {
-        const [latest, savedHistory] = await Promise.all([fetchLatestAnalysis(), fetchHistory(10)]);
+        const [latest, savedHistory] = await Promise.all([fetchLatestAnalysis(), fetchHistory(50)]);
         
         if (!isInitialLoad && previousDangerLevel && previousDangerLevel !== latest.danger_level) {
           if (Notification.permission === "granted") {
