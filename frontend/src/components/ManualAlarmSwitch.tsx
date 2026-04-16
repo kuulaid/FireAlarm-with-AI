@@ -91,8 +91,12 @@ const ManualAlarmSwitch: React.FC = () => {
     await applyUpdate({ feed_paused: !(alarmState?.feed_paused ?? false) });
   };
 
-  const toggleBuzzer = async () => {
-    await applyUpdate({ is_active: !(alarmState?.is_active ?? false) });
+  const turnBuzzerOn = async () => {
+    await applyUpdate({ is_active: true });
+  };
+
+  const turnBuzzerOff = async () => {
+    await applyUpdate({ is_active: false });
   };
 
   const selectScenario = async (scenario: AlarmScenario) => {
@@ -136,19 +140,36 @@ const ManualAlarmSwitch: React.FC = () => {
           </div>
         </button>
 
-        <button
-          onClick={toggleBuzzer}
-          disabled={isSaving}
-          className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-            alarmState?.is_active
-              ? "border-red-400/50 bg-red-500/10 text-red-100"
-              : "border-slate-700 bg-slate-900 text-slate-200"
-          } ${isSaving ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.01]"}`}
-        >
-          <div className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Buzzer</div>
-          <div className="mt-1 text-lg font-bold">{alarmState?.is_active ? "On" : "Off"}</div>
-          <div className="mt-1 text-sm text-slate-300">Use this as a simple actuator override for test runs.</div>
-        </button>
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400 mb-3">Buzzer Control</div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={turnBuzzerOn}
+              disabled={isSaving}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-all ${
+                alarmState?.is_active
+                  ? "border-red-400 bg-red-500/15 text-red-200"
+                  : "border-slate-600 bg-slate-800 text-slate-300 hover:border-red-400/50"
+              } ${isSaving ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.02]"}`}
+            >
+              Turn On
+            </button>
+            <button
+              onClick={turnBuzzerOff}
+              disabled={isSaving}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-all ${
+                !alarmState?.is_active
+                  ? "border-slate-500 bg-slate-800 text-slate-200"
+                  : "border-slate-600 bg-slate-900 text-slate-300 hover:border-slate-500"
+              } ${isSaving ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.02]"}`}
+            >
+              Turn Off
+            </button>
+          </div>
+          <div className="mt-2 text-sm text-slate-400">
+            Current: <span className={alarmState?.is_active ? "text-red-200 font-semibold" : "text-slate-300"}>{alarmState?.is_active ? "On" : "Off"}</span>
+          </div>
+        </div>
       </div>
 
       <div className="mt-6">
