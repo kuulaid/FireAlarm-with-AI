@@ -2,6 +2,8 @@ import type { LogEntry, Sensors } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
+export type AlarmScenario = "LIVE" | "SAFE" | "WARM" | "PARTIAL_SMOKE" | "SMOKE" | "CO_DETECTION" | "GAS_LEAK" | "EXTREME_HEAT" | "ELECTRICAL_FIRE" | "HIGH_HUMIDITY" | "MIXED_HAZARD" | "CONTROLLED_BURN" | "DUSTY_AIR" | "FIRE_TEST";
+
 interface ApiAnalysis {
   danger: boolean;
   danger_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -27,6 +29,14 @@ interface ApiReadingPayload {
   timestamp?: string;
   created_at?: string;
   analysis: ApiAnalysis;
+}
+
+export interface ApiAlarmState {
+  is_active: boolean;
+  feed_paused: boolean;
+  scenario: AlarmScenario;
+  reading: Omit<ApiReadingPayload, "analysis"> | null;
+  analysis: ApiAnalysis | null;
 }
 
 interface ApiLatestResponse {
@@ -71,6 +81,17 @@ function toLogEntry(payload: ApiReadingPayload): LogEntry {
   };
 }
 
+export function alarmStateToLogEntry(state: ApiAlarmState): LogEntry | null {
+  if (!state.reading || !state.analysis) {
+    return null;
+  }
+
+  return toLogEntry({
+    ...state.reading,
+    analysis: state.analysis,
+  });
+}
+
 export async function fetchLatestAnalysis(): Promise<LogEntry> {
   const data = await apiFetch<ApiLatestResponse>("/api/latest");
   
@@ -91,6 +112,26 @@ export async function fetchLatestAnalysis(): Promise<LogEntry> {
   };
 
   return toLogEntry(readingPayload);
+}
+
+export async function fetchAlarmState(): Promise<ApiAlarmState> {
+  return apiFetch<ApiAlarmState>("/api/alarm");
+}
+
+export async function updateAlarmState(state: Partial<ApiAlarmState>): Promise<ApiAlarmState> {
+  const response = await fetch(`${BASE_URL}/api/alarm`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(state),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 export async function fetchHistory(limit = 10): Promise<LogEntry[]> {

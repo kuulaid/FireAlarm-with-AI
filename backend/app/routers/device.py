@@ -113,6 +113,12 @@ def post_reading(reading: SensorReading):
         if "Flame sensor detected fire" not in ai_result["reasons"]:
             ai_result["reasons"] = ["Flame sensor detected fire"] + ai_result.get("reasons", [])
 
+    # Keep actuator flags aligned with the final danger decision so downstream clients
+    # do not depend on the model returning a perfectly consistent payload.
+    if ai_result.get("danger") or ai_result.get("danger_level") in ("HIGH", "CRITICAL"):
+        ai_result["trigger_buzzer"] = True
+        ai_result["trigger_led"] = True
+
     LATEST_ANALYSIS["reading"] = normalized_reading.model_dump()
     LATEST_ANALYSIS["analysis"] = ai_result
 
