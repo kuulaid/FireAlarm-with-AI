@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.schemas.sensor import AnalysisResult
+from app.state import ALARM_ACTUATOR_STATE
 
 router = APIRouter(prefix="/api",
                    tags=["alarms"])
@@ -345,12 +346,7 @@ def build_alarm_preview(scenario: str, reading_index: int = 0) -> tuple[AlarmRea
     return readings[idx]
 
 
-current_alarm_state = {
-    "is_active": False,
-    "feed_paused": False,
-    "scenario": AlarmScenario.LIVE,
-    "reading_index": 0,
-}
+current_alarm_state = ALARM_ACTUATOR_STATE
 
 @router.get("/alarm", response_model=AlarmState)
 def get_alarm_state():

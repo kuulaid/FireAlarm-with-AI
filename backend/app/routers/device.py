@@ -3,7 +3,7 @@ from app.schemas.sensor import SensorReading, AnalysisResult
 from app.services.analysis import heuristic_risk
 from app.services.analysis import evaluate_flame_signal
 from app.services.openai_service import analyze_with_openai
-from app.state import LATEST_ANALYSIS, FLAME_SIGNAL_STATE
+from app.state import LATEST_ANALYSIS, FLAME_SIGNAL_STATE, ALARM_ACTUATOR_STATE
 from app.core.database import readings_collection, results_collection
 from app.core.config import FLAME_OVERRIDE_MIN_CONFIDENCE
 from datetime import datetime, timedelta, timezone
@@ -118,6 +118,11 @@ def post_reading(reading: SensorReading):
     if ai_result.get("danger") or ai_result.get("danger_level") in ("HIGH", "CRITICAL"):
         ai_result["trigger_buzzer"] = True
         ai_result["trigger_led"] = True
+
+    # Sync live analysis to actuator state unless manual scenario mode is active.
+    if not ALARM_ACTUATOR_STATE.get("feed_paused", False):
+        ALARM_ACTUATOR_STATE["is_active"] = bool(ai_result.get("trigger_buzzer", False))
+        ALARM_ACTUATOR_STATE["scenario"] = "LIVE"
 
     LATEST_ANALYSIS["reading"] = normalized_reading.model_dump()
     LATEST_ANALYSIS["analysis"] = ai_result
