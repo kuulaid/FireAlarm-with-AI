@@ -352,6 +352,8 @@ current_alarm_state = ALARM_ACTUATOR_STATE
 def get_alarm_state():
     scenario = current_alarm_state.get("scenario", AlarmScenario.LIVE)
     reading, analysis = build_alarm_preview(scenario, current_alarm_state["reading_index"])
+    feed_paused = current_alarm_state.get("feed_paused", False)
+    effective_is_active = bool(current_alarm_state.get("is_active", False)) and bool(feed_paused)
     
     # Increment index for next call (cycles through readings)
     if scenario != AlarmScenario.LIVE and reading is not None:
@@ -359,8 +361,8 @@ def get_alarm_state():
         current_alarm_state["reading_index"] = (current_alarm_state["reading_index"] + 1) % len(readings)
     
     return {
-        "is_active": current_alarm_state["is_active"],
-        "feed_paused": current_alarm_state.get("feed_paused", False),
+        "is_active": effective_is_active,
+        "feed_paused": feed_paused,
         "scenario": scenario,
         "reading": reading,
         "analysis": analysis,
@@ -372,10 +374,17 @@ def set_alarm_state(state: AlarmUpdate):
         current_alarm_state["is_active"] = state.is_active
     if state.feed_paused is not None:
         current_alarm_state["feed_paused"] = state.feed_paused
+        # Manual buzzer override only applies when feed is paused.
+        if not state.feed_paused:
+            current_alarm_state["is_active"] = False
     if state.scenario is not None:
         current_alarm_state["scenario"] = state.scenario
         # Reset index when scenario changes
         current_alarm_state["reading_index"] = 0
+
+    # Live mode should never keep manual buzzer latched on.
+    if not current_alarm_state.get("feed_paused", False):
+        current_alarm_state["is_active"] = False
 
     scenario = current_alarm_state.get("scenario", AlarmScenario.LIVE)
     reading, analysis = build_alarm_preview(scenario, current_alarm_state["reading_index"])
